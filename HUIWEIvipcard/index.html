@@ -1,0 +1,92 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>我的會員卡</title>
+  <style>
+    /* CSS 與之前完全相同 */
+    body { font-family: sans-serif; background-color: #f5f6f7; display: flex; justify-content: center; align-items: center; height: 100vh; margin: 0; }
+    .card { background: white; border-radius: 16px; padding: 30px 20px; box-shadow: 0 8px 20px rgba(0,0,0,0.08); width: 85%; max-width: 340px; text-align: center; display: none; }
+    .avatar { width: 90px; height: 90px; border-radius: 50%; margin-bottom: 12px; border: 3px solid #00B900; object-fit: cover; }
+    .name { font-size: 1.3em; font-weight: bold; color: #333; margin-bottom: 6px; }
+    .points-container { background: #f9f9f9; border-radius: 8px; padding: 10px; margin: 15px 0; }
+    .points { color: #00B900; font-size: 1.5em; font-weight: bold; }
+    #barcode { width: 100%; max-width: 280px; margin-top: 10px; }
+    .member-id { margin-top: 5px; font-size: 0.85em; color: #777; letter-spacing: 1px; }
+    .loading { color: #666; font-size: 1.1em; text-align: center; padding: 20px;}
+  </style>
+  <script src="https://static.line-scdn.net/liff/edge/2/sdk.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/jsbarcode@3.11.5/dist/JsBarcode.all.min.js"></script>
+</head>
+<body>
+
+  <div id="loading" class="loading">正在啟動會員系統...</div>
+
+  <div class="card" id="card">
+    <img id="avatar" class="avatar" src="" alt="Avatar">
+    <div id="name" class="name">-</div>
+    <div class="points-container">
+      <div>目前點數</div>
+      <div class="points"><span id="points">0</span> pt</div>
+    </div>
+    <svg id="barcode"></svg>
+    <div class="member-id">No. <span id="memberId"></span></div>
+  </div>
+
+  <script>
+    // 1. 填入你的 LIFF ID
+    const MY_LIFF_ID = "2010177395-VZuUV9Wk";
+    // 2. 填入剛剛複製的 GAS 網頁應用程式網址 (API 網址)
+    const GAS_API_URL = "https://script.google.com/macros/s/AKfycbxwCyiA5-nIB9b99SowHZbYwq3uvMwgX2i7Pu6n_pEnpP4AzcRpN8p1qHS-TOLsHfQkmA/exec";
+
+    async function main() {
+      try {
+        await liff.init({ liffId: MY_LIFF_ID });
+        
+        if (liff.isLoggedIn()) {
+          document.getElementById('loading').innerText = "讀取會員資料中...";
+          const profile = await liff.getProfile();
+          
+          document.getElementById('avatar').src = profile.pictureUrl || 'https://via.placeholder.com/90';
+          document.getElementById('name').innerText = profile.displayName;
+          
+          fetchMemberData(profile);
+        } else {
+          // 在沒有 iframe 的環境下，這裡跳轉登入就不會報錯了
+          liff.login();
+        }
+      } catch (err) {
+        document.getElementById('loading').innerText = "發生錯誤: " + err.message;
+      }
+    }
+
+    function fetchMemberData(profile) {
+      // 將資料轉換為網址參數 GET 請求
+      const url = `${GAS_API_URL}?userId=${profile.userId}&displayName=${encodeURIComponent(profile.displayName)}&pictureUrl=${encodeURIComponent(profile.pictureUrl || '')}`;
+
+      fetch(url)
+        .then(response => response.json())
+        .then(data => {
+          if(data.status === 'success') {
+            document.getElementById('loading').style.display = 'none';
+            document.getElementById('card').style.display = 'block';
+            document.getElementById('points').innerText = data.points;
+            document.getElementById('memberId').innerText = data.memberId;
+            JsBarcode("#barcode", data.memberId, {
+              format: "CODE128", lineColor: "#222", width: 2, height: 60, displayValue: false, margin: 0
+            });
+          } else {
+            document.getElementById('loading').innerText = "資料格式錯誤";
+          }
+        })
+        .catch(err => {
+          document.getElementById('loading').innerText = "連線後端失敗";
+          console.error(err);
+        });
+    }
+
+    main();
+  </script>
+</body>
+</html>
